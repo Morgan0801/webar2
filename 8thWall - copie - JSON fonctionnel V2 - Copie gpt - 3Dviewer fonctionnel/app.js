@@ -127,62 +127,6 @@ AFRAME.registerComponent('smooth-position', {
 });
 
 // ========================================
-// COMPOSANT: Lock Scale During Drag (empêche scale automatique pendant drag)
-// ========================================
-AFRAME.registerComponent('lock-scale-on-drag', {
-  schema: {
-    enabled: {default: true}
-  },
-
-  init: function() {
-    this.lockedScale = null;
-    this.isDragging = false;
-    this.isPinching = false;
-
-    // Écoute le début du drag
-    this.el.addEventListener('xrextras-drag-start', () => {
-      if (!this.data.enabled) return;
-      this.isDragging = true;
-      // Mémorise le scale au début du drag
-      this.lockedScale = {
-        x: this.el.object3D.scale.x,
-        y: this.el.object3D.scale.y,
-        z: this.el.object3D.scale.z
-      };
-      console.log('Drag started, scale locked at:', this.lockedScale);
-    });
-
-    // Écoute la fin du drag
-    this.el.addEventListener('xrextras-drag-end', () => {
-      this.isDragging = false;
-      console.log('Drag ended, scale unlocked');
-    });
-
-    // Écoute le pinch (ne pas forcer le scale pendant pinch)
-    this.el.addEventListener('xrextras-pinch-scale-start', () => {
-      this.isPinching = true;
-    });
-
-    this.el.addEventListener('xrextras-pinch-scale-end', () => {
-      this.isPinching = false;
-    });
-  },
-
-  tick: function() {
-    if (!this.data.enabled) return;
-
-    // Force le scale UNIQUEMENT pendant le drag (pas pendant pinch)
-    if (this.isDragging && !this.isPinching && this.lockedScale) {
-      this.el.object3D.scale.set(
-        this.lockedScale.x,
-        this.lockedScale.y,
-        this.lockedScale.z
-      );
-    }
-  }
-});
-
-// ========================================
 // COMPOSANT: Extend Camera Near Plane
 // ========================================
 AFRAME.registerComponent('extend-camera-near', {
@@ -1058,15 +1002,12 @@ const activateARMode = () => {
     }
 
     // Re-enable AR gesture controls
-    AppState.modelEntity.setAttribute('xrextras-hold-drag', '');
+    AppState.modelEntity.setAttribute('xrextras-hold-drag', 'dragDelay: 0');
     AppState.modelEntity.setAttribute('xrextras-two-finger-rotate', '');
     AppState.modelEntity.setAttribute('xrextras-pinch-scale', 'min: 0.5; max: 3');
 
     // DISABLE smooth-position in AR mode (interfère avec le tracking AR)
     AppState.modelEntity.setAttribute('smooth-position', 'enabled', false);
-
-    // ENABLE lock-scale-on-drag in AR mode (empêche scale automatique pendant drag)
-    AppState.modelEntity.setAttribute('lock-scale-on-drag', 'enabled', true);
 
     // ENABLE place-on-surface in AR mode (placement automatique sur surface détectée)
     AppState.modelEntity.setAttribute('place-on-surface', 'enabled', true);
@@ -1121,9 +1062,6 @@ const activate3DViewerMode = () => {
       rotationSpeed: 1.0,
       zoomSpeed: 1.0
     });
-
-    // DISABLE lock-scale-on-drag in 3D mode (pas de drag en 3D viewer)
-    AppState.modelEntity.setAttribute('lock-scale-on-drag', 'enabled', false);
 
     // DISABLE place-on-surface in 3D mode (pas de placement automatique)
     AppState.modelEntity.setAttribute('place-on-surface', 'enabled', false);
