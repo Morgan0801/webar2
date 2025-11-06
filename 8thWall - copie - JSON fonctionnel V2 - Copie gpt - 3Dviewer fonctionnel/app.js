@@ -1034,9 +1034,6 @@ const activate3DViewerMode = () => {
       zoomSpeed: 1.0
     });
 
-    // Enable smooth-position in 3D mode (optional smoothing for viewer)
-    AppState.modelEntity.setAttribute('smooth-position', 'enabled', true);
-
     // DISABLE force-constant-scale in 3D mode (permettre zoom libre)
     AppState.modelEntity.setAttribute('force-constant-scale', 'enabled', false);
 
