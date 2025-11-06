@@ -43,50 +43,52 @@ AFRAME.registerComponent('smooth-position', {
 });
 
 // ========================================
-// COMPOSANT: Force Constant Scale (empêche scale automatique)
+// COMPOSANT: Lock Scale During Drag (empêche scale automatique pendant drag)
 // ========================================
-AFRAME.registerComponent('force-constant-scale', {
+AFRAME.registerComponent('lock-scale-on-drag', {
   schema: {
     enabled: {default: true}
   },
 
   init: function() {
     this.lockedScale = null;
+    this.isDragging = false;
     this.isPinching = false;
-    this.isInitialized = false;
 
-    // Écoute les événements de pinch pour permettre le zoom manuel
+    // Écoute le début du drag
+    this.el.addEventListener('xrextras-drag-start', () => {
+      if (!this.data.enabled) return;
+      this.isDragging = true;
+      // Mémorise le scale au début du drag
+      this.lockedScale = {
+        x: this.el.object3D.scale.x,
+        y: this.el.object3D.scale.y,
+        z: this.el.object3D.scale.z
+      };
+      console.log('Drag started, scale locked at:', this.lockedScale);
+    });
+
+    // Écoute la fin du drag
+    this.el.addEventListener('xrextras-drag-end', () => {
+      this.isDragging = false;
+      console.log('Drag ended, scale unlocked');
+    });
+
+    // Écoute le pinch (ne pas forcer le scale pendant pinch)
     this.el.addEventListener('xrextras-pinch-scale-start', () => {
       this.isPinching = true;
     });
 
     this.el.addEventListener('xrextras-pinch-scale-end', () => {
       this.isPinching = false;
-      // Mémorise le nouveau scale après le pinch
-      this.lockedScale = {
-        x: this.el.object3D.scale.x,
-        y: this.el.object3D.scale.y,
-        z: this.el.object3D.scale.z
-      };
     });
   },
 
   tick: function() {
     if (!this.data.enabled) return;
 
-    // Initialise le scale verrouillé au premier tick
-    if (!this.isInitialized && this.el.object3D.scale.x > 0) {
-      this.lockedScale = {
-        x: this.el.object3D.scale.x,
-        y: this.el.object3D.scale.y,
-        z: this.el.object3D.scale.z
-      };
-      this.isInitialized = true;
-      console.log('Scale locked at:', this.lockedScale);
-    }
-
-    // Force le scale constant (sauf pendant le pinch)
-    if (!this.isPinching && this.lockedScale) {
+    // Force le scale UNIQUEMENT pendant le drag (pas pendant pinch)
+    if (this.isDragging && !this.isPinching && this.lockedScale) {
       this.el.object3D.scale.set(
         this.lockedScale.x,
         this.lockedScale.y,
@@ -979,10 +981,10 @@ const activateARMode = () => {
     // DISABLE smooth-position in AR mode (interfère avec le tracking AR)
     AppState.modelEntity.setAttribute('smooth-position', 'enabled', false);
 
-    // ENABLE force-constant-scale in AR mode (empêche scale automatique)
-    AppState.modelEntity.setAttribute('force-constant-scale', 'enabled', true);
+    // ENABLE lock-scale-on-drag in AR mode (empêche scale automatique pendant drag)
+    AppState.modelEntity.setAttribute('lock-scale-on-drag', 'enabled', true);
 
-    // Position model in front of camera (visible by default)
+    // Position model at ground level in front of camera (sur une surface)
     AppState.modelEntity.setAttribute('position', '0 0 -1.5');
     AppState.modelEntity.setAttribute('rotation', '0 0 0');
 
@@ -1034,8 +1036,8 @@ const activate3DViewerMode = () => {
       zoomSpeed: 1.0
     });
 
-    // DISABLE force-constant-scale in 3D mode (permettre zoom libre)
-    AppState.modelEntity.setAttribute('force-constant-scale', 'enabled', false);
+    // DISABLE lock-scale-on-drag in 3D mode (pas de drag en 3D viewer)
+    AppState.modelEntity.setAttribute('lock-scale-on-drag', 'enabled', false);
 
     // Center model in front of camera (fixed position for QuickLook style)
     AppState.modelEntity.setAttribute('position', '0 0 -2');
