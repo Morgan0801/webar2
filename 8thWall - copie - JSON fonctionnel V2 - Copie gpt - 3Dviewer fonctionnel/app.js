@@ -1006,8 +1006,8 @@ const activateARMode = () => {
     AppState.modelEntity.setAttribute('xrextras-two-finger-rotate', '');
     AppState.modelEntity.setAttribute('xrextras-pinch-scale', 'min: 0.5; max: 3');
 
-    // DISABLE smooth-position in AR mode (interfère avec le tracking AR)
-    AppState.modelEntity.setAttribute('smooth-position', 'enabled', false);
+    // ENABLE smooth-position in AR mode (lisse les sauts du tracking)
+    AppState.modelEntity.setAttribute('smooth-position', 'enabled', true);
 
     // ENABLE place-on-surface in AR mode (placement automatique sur surface détectée)
     AppState.modelEntity.setAttribute('place-on-surface', 'enabled', true);
@@ -1062,6 +1062,9 @@ const activate3DViewerMode = () => {
       rotationSpeed: 1.0,
       zoomSpeed: 1.0
     });
+
+    // DISABLE smooth-position in 3D mode (pas nécessaire, position fixe)
+    AppState.modelEntity.setAttribute('smooth-position', 'enabled', false);
 
     // DISABLE place-on-surface in 3D mode (pas de placement automatique)
     AppState.modelEntity.setAttribute('place-on-surface', 'enabled', false);
