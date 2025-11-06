@@ -4,6 +4,41 @@
 // is loaded, and before body.html is loaded.
 
 // ========================================
+// COMPOSANT: Smooth Position (Anti-Jitter)
+// ========================================
+AFRAME.registerComponent('smooth-position', {
+  schema: {
+    factor: {default: 0.15} // 0.1 = très smooth mais latence, 0.3 = moins smooth mais réactif
+  },
+
+  init: function() {
+    this.targetPosition = new THREE.Vector3();
+    this.smoothPosition = new THREE.Vector3();
+    this.firstUpdate = true;
+  },
+
+  tick: function() {
+    if (!this.el.object3D.visible) return;
+
+    // Première frame : initialise la position smooth
+    if (this.firstUpdate) {
+      this.smoothPosition.copy(this.el.object3D.position);
+      this.firstUpdate = false;
+      return;
+    }
+
+    // Récupère la position cible (du tracking AR)
+    this.targetPosition.copy(this.el.object3D.position);
+
+    // Interpolation smooth (lerp)
+    this.smoothPosition.lerp(this.targetPosition, this.data.factor);
+
+    // Applique la position smooth
+    this.el.object3D.position.copy(this.smoothPosition);
+  }
+});
+
+// ========================================
 // A-Frame Custom Component: 3D Viewer Orbit Controls
 // ========================================
 
