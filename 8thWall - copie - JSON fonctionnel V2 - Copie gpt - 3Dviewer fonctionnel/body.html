@@ -1,0 +1,122 @@
+<!-- Copyright (c) 2022 8th Wall, Inc. -->
+<!-- body.html is optional; elements will be added to your html body after app.js is loaded. -->
+
+<a-scene
+  xrextras-gesture-detector
+  landing-page
+  xrextras-loading
+  xrextras-runtime-error
+  renderer="colorManagement: true"
+  xrweb="allowedDevices: any">
+
+  <!-- Assets will be loaded dynamically -->
+  <a-assets id="assets">
+    <!-- Assets will be added dynamically via JavaScript -->
+  </a-assets>
+
+  <!-- The raycaster will emit mouse events on scene objects specified with the cantap class -->
+  <a-camera
+    id="camera"
+    position="0 2 2"
+    rotation="0 0 0"
+    raycaster="objects: .cantap"
+    cursor="fuse: false; rayOrigin: mouse;">
+    <!-- Viewer mode curtain: hides camera feed when active -->
+    <a-entity
+      id="viewer-curtain"
+      geometry="primitive: sphere; radius: 4"
+      material="shader: flat; color: #222; side: back"
+      visible="false">
+    </a-entity>
+  </a-camera>
+
+  <a-entity
+    light="
+      type: directional;
+      intensity: 0.8;
+      castShadow: true;
+      shadowMapHeight:2048;
+      shadowMapWidth:2048;
+      shadowCameraTop: 10;
+      target: #model;
+      shadowRadius: 12"
+    xrextras-attach="target: model; offset: 1 15 3;"
+    shadow>
+  </a-entity>
+
+  <a-light type="ambient" intensity="0.7"></a-light>
+
+  <!-- Dish model - will be loaded dynamically -->
+  <a-entity
+    id="model"
+    position="0 2 -1"
+    rotation="0 0 0"
+    scale="1 1 1"
+    visible="false"
+    class="cantap"
+    viewer-orbit-controls="enabled: false"
+    xrextras-hold-drag
+    xrextras-two-finger-rotate
+    xrextras-pinch-scale
+    shadow="receive: false">
+  </a-entity>
+
+  <a-plane
+    id="ground"
+    rotation="-90 0 0"
+    width="1000"
+    height="1000"
+    material="shader: shadow"
+    shadow>
+  </a-plane>
+</a-scene>
+
+<!-- 3D Viewer Mode Background -->
+<div id="viewer-background"></div>
+
+<!-- AR Overlay UI -->
+<div id="ar-overlay">
+  <!-- Header Section -->
+  <div class="header-container">
+    <img id="restaurant-logo" class="restaurant-logo" src="" alt="Restaurant Logo">
+    <button id="ar-toggle-btn" class="ar-toggle-btn">AR</button>
+  </div>
+
+  <!-- Dish Info Section -->
+  <div class="dish-info">
+    <h1 id="dish-name" class="dish-name">Loading...</h1>
+    <p id="dish-description" class="dish-description">Please wait</p>
+  </div>
+
+  <!-- Bottom Section (Filter + Carousel) -->
+  <div class="bottom-container">
+    <!-- Filter Dropdown -->
+    <div class="filter-container">
+      <button id="filter-btn" class="filter-btn">
+        <span id="filter-btn-text">All</span>
+      </button>
+      <div id="filter-dropdown" class="filter-dropdown">
+        <!-- Options will be generated dynamically -->
+      </div>
+    </div>
+
+    <!-- Carousel -->
+    <div class="carousel-container">
+      <div class="carousel-wrapper">
+        <div id="carousel" class="carousel">
+          <!-- Dish thumbnails will be generated dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Loader -->
+<div id="loader" class="loader-container">
+  <div class="loader"></div>
+</div>
+
+<!-- Error Message -->
+<div id="error-message" class="error-message">
+  <span id="error-text">An error occurred</span>
+</div>

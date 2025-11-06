@@ -1,0 +1,50 @@
+{
+  "restaurantLogo": "https://letsenhance.io/static/73136da51c245e80edc6ccfe44888a99/396e9/MainBefore.jpg",
+  "dishes": [
+    {
+      "id": "dish-1",
+      "name": "Poulet Pâtes",
+      "description": "Pasta with chicken",
+      "category": "plats",
+      "modelUrl": "https://pub-e4443a68f0ab47a485ec4603d6902c2a.r2.dev/Poulet-pate.glb",
+      "thumbnailUrl": "https://letsenhance.io/static/73136da51c245e80edc6ccfe44888a99/396e9/MainBefore.jpg",
+      "scale": 3.0
+    },
+    {
+      "id": "dish-2",
+      "name": "Avocado",
+      "description": "Fresh avocado model",
+      "category": "plats",
+      "modelUrl": "https://modelviewer.dev/shared-assets/models/Avocado.glb",
+      "thumbnailUrl": "https://letsenhance.io/static/73136da51c245e80edc6ccfe44888a99/396e9/MainBefore.jpg",
+      "scale": 20.0
+    },
+    {
+      "id": "dish-3",
+      "name": "Astronaut",
+      "description": "Test model astronaut",
+      "category": "plats",
+      "modelUrl": "https://modelviewer.dev/shared-assets/models/Astronaut.glb",
+      "thumbnailUrl": "https://letsenhance.io/static/73136da51c245e80edc6ccfe44888a99/396e9/MainBefore.jpg",
+      "scale": 5.0
+    },
+    {
+      "id": "dish-4",
+      "name": "Damaged Helmet",
+      "description": "Test model helmet",
+      "category": "dessert",
+      "modelUrl": "https://modelviewer.dev/shared-assets/models/glTF-Sample-Assets/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb",
+      "thumbnailUrl": "https://letsenhance.io/static/73136da51c245e80edc6ccfe44888a99/396e9/MainBefore.jpg",
+      "scale": 2.0
+    },
+    {
+      "id": "dish-5",
+      "name": "Macarons (KTX2)",
+      "description": "Delicious French macarons",
+      "category": "dessert",
+      "modelUrl": "https://pub-e4443a68f0ab47a485ec4603d6902c2a.r2.dev/macaronsVF-ktx2.glb",
+      "thumbnailUrl": "https://letsenhance.io/static/73136da51c245e80edc6ccfe44888a99/396e9/MainBefore.jpg",
+      "scale": 3.0
+    }
+  ]
+}
