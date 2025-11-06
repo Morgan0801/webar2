@@ -88,45 +88,6 @@ AFRAME.registerComponent('place-on-surface', {
 });
 
 // ========================================
-// COMPOSANT: Smooth Position (Anti-Jitter)
-// DÉSACTIVÉ EN MODE AR - ACTIF UNIQUEMENT EN MODE 3D VIEWER
-// ========================================
-AFRAME.registerComponent('smooth-position', {
-  schema: {
-    enabled: {default: false}, // Désactivé par défaut (pour AR)
-    factor: {default: 0.15} // 0.1 = très smooth mais latence, 0.3 = moins smooth mais réactif
-  },
-
-  init: function() {
-    this.targetPosition = new THREE.Vector3();
-    this.smoothPosition = new THREE.Vector3();
-    this.firstUpdate = true;
-  },
-
-  tick: function() {
-    // NE PAS APPLIQUER en mode AR (interfère avec le tracking)
-    if (!this.data.enabled) return;
-    if (!this.el.object3D.visible) return;
-
-    // Première frame : initialise la position smooth
-    if (this.firstUpdate) {
-      this.smoothPosition.copy(this.el.object3D.position);
-      this.firstUpdate = false;
-      return;
-    }
-
-    // Récupère la position cible (du tracking AR)
-    this.targetPosition.copy(this.el.object3D.position);
-
-    // Interpolation smooth (lerp)
-    this.smoothPosition.lerp(this.targetPosition, this.data.factor);
-
-    // Applique la position smooth
-    this.el.object3D.position.copy(this.smoothPosition);
-  }
-});
-
-// ========================================
 // COMPOSANT: Extend Camera Near Plane
 // ========================================
 AFRAME.registerComponent('extend-camera-near', {
@@ -1006,9 +967,6 @@ const activateARMode = () => {
     AppState.modelEntity.setAttribute('xrextras-two-finger-rotate', '');
     AppState.modelEntity.setAttribute('xrextras-pinch-scale', 'min: 0.5; max: 3');
 
-    // ENABLE smooth-position in AR mode (lisse les sauts du tracking)
-    AppState.modelEntity.setAttribute('smooth-position', 'enabled', true);
-
     // ENABLE place-on-surface in AR mode (placement automatique sur surface détectée)
     AppState.modelEntity.setAttribute('place-on-surface', 'enabled', true);
 
@@ -1062,9 +1020,6 @@ const activate3DViewerMode = () => {
       rotationSpeed: 1.0,
       zoomSpeed: 1.0
     });
-
-    // DISABLE smooth-position in 3D mode (pas nécessaire, position fixe)
-    AppState.modelEntity.setAttribute('smooth-position', 'enabled', false);
 
     // DISABLE place-on-surface in 3D mode (pas de placement automatique)
     AppState.modelEntity.setAttribute('place-on-surface', 'enabled', false);
