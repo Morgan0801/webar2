@@ -79,6 +79,30 @@ AFRAME.registerComponent('lock-scale-after-pinch', {
 });
 
 // ========================================
+// COMPOSANT: Extend Camera Near Plane
+// ========================================
+AFRAME.registerComponent('extend-camera-near', {
+  init: function() {
+    // Attend que la caméra soit initialisée
+    const checkCamera = () => {
+      const camera = this.el.getObject3D('camera');
+      if (camera && camera.isPerspectiveCamera) {
+        // Permet de s'approcher TRÈS près (1cm au lieu de 10cm)
+        camera.near = 0.01;
+        camera.far = 10000;
+        camera.updateProjectionMatrix();
+        console.log('Camera near plane extended to 0.01m');
+      } else {
+        // Réessaie dans 100ms si la caméra n'est pas prête
+        setTimeout(checkCamera, 100);
+      }
+    };
+
+    checkCamera();
+  }
+});
+
+// ========================================
 // A-Frame Custom Component: 3D Viewer Orbit Controls
 // ========================================
 
