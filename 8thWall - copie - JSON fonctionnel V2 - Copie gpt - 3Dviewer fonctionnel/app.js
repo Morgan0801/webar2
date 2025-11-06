@@ -4,6 +4,90 @@
 // is loaded, and before body.html is loaded.
 
 // ========================================
+// COMPOSANT: Place On Detected Surface (utilise le hit testing 8th Wall)
+// ========================================
+AFRAME.registerComponent('place-on-surface', {
+  schema: {
+    enabled: {default: true},
+    distance: {default: 1.5}, // Distance devant la caméra
+    autoPlace: {default: true} // Place automatiquement au démarrage
+  },
+
+  init: function() {
+    this.placed = false;
+    this.camera = null;
+
+    // Attend que la scène soit prête
+    this.el.sceneEl.addEventListener('realityready', () => {
+      this.camera = document.querySelector('#camera');
+      console.log('Reality ready, camera found:', !!this.camera);
+
+      if (this.data.autoPlace) {
+        // Attend un peu que le tracking se stabilise
+        setTimeout(() => {
+          this.placeOnSurface();
+        }, 500);
+      }
+    });
+  },
+
+  placeOnSurface: function() {
+    if (!this.data.enabled || this.placed || !this.camera) return;
+
+    const camera = this.camera.object3D;
+
+    // Position devant la caméra (direction forward)
+    const cameraPos = camera.position.clone();
+    const forward = new THREE.Vector3(0, 0, -1);
+    forward.applyQuaternion(camera.quaternion);
+
+    // Calcule le point devant la caméra
+    const targetPos = cameraPos.clone().add(forward.multiplyScalar(this.data.distance));
+
+    // Utilise l'API hit test de 8th Wall si disponible
+    if (window.XR8 && XR8.XrController && XR8.XrController.hitTest) {
+      // Converti la position 3D en coordonnées d'écran normalisées
+      const screenX = 0.5; // Centre de l'écran
+      const screenY = 0.5;
+
+      const hits = XR8.XrController.hitTest(screenX, screenY);
+
+      if (hits && hits.length > 0) {
+        // Prend le premier hit (surface la plus proche)
+        const hit = hits[0];
+
+        // Place le modèle sur la surface détectée
+        this.el.object3D.position.set(
+          hit.position.x,
+          hit.position.y,
+          hit.position.z
+        );
+
+        console.log('Model placed on detected surface at:', hit.position);
+        this.placed = true;
+        this.el.setAttribute('visible', true);
+        this.el.emit('placed-on-surface');
+        return;
+      }
+    }
+
+    // Fallback : place à la position calculée (si pas de hit test disponible)
+    targetPos.y = 0; // Au niveau du sol par défaut
+    this.el.object3D.position.copy(targetPos);
+    this.el.setAttribute('visible', true);
+    this.placed = true;
+    console.log('Model placed at fallback position:', targetPos);
+  },
+
+  tick: function() {
+    // Continue d'essayer jusqu'à ce que le placement réussisse
+    if (this.data.enabled && this.data.autoPlace && !this.placed && this.camera) {
+      this.placeOnSurface();
+    }
+  }
+});
+
+// ========================================
 // COMPOSANT: Smooth Position (Anti-Jitter)
 // DÉSACTIVÉ EN MODE AR - ACTIF UNIQUEMENT EN MODE 3D VIEWER
 // ========================================
@@ -984,9 +1068,11 @@ const activateARMode = () => {
     // ENABLE lock-scale-on-drag in AR mode (empêche scale automatique pendant drag)
     AppState.modelEntity.setAttribute('lock-scale-on-drag', 'enabled', true);
 
-    // Position model at table height in front of camera (Y=0.8m = hauteur table)
-    AppState.modelEntity.setAttribute('position', '0 0.8 -1.5');
-    AppState.modelEntity.setAttribute('rotation', '0 0 0');
+    // ENABLE place-on-surface in AR mode (placement automatique sur surface détectée)
+    AppState.modelEntity.setAttribute('place-on-surface', 'enabled', true);
+
+    // La position sera définie automatiquement par place-on-surface
+    // On ne force plus la position ici
 
     // Reset scale to dish default
     if (AppState.currentDish) {
@@ -1038,6 +1124,9 @@ const activate3DViewerMode = () => {
 
     // DISABLE lock-scale-on-drag in 3D mode (pas de drag en 3D viewer)
     AppState.modelEntity.setAttribute('lock-scale-on-drag', 'enabled', false);
+
+    // DISABLE place-on-surface in 3D mode (pas de placement automatique)
+    AppState.modelEntity.setAttribute('place-on-surface', 'enabled', false);
 
     // Center model in front of camera (fixed position for QuickLook style)
     AppState.modelEntity.setAttribute('position', '0 0 -2');
