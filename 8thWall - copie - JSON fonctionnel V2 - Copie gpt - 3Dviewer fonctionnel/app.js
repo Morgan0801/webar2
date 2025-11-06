@@ -105,7 +105,7 @@ AFRAME.registerComponent('place-on-surface', {
 });
 
 // ========================================
-// COMPOSANT: World Anchor (inspiré de floatnotes - ancrage en coordonnées mondiales)
+// COMPOSANT: Native Anchor (utilise l'API bas niveau THREE.js + 8th Wall)
 // ========================================
 AFRAME.registerComponent('world-anchor', {
   schema: {
@@ -114,50 +114,93 @@ AFRAME.registerComponent('world-anchor', {
 
   init: function() {
     this.isDragging = false;
-    this.savedWorldPosition = null;
-    this.savedWorldRotation = null;
-    this.lastParent = null;
+    this.anchoredMatrix = null; // Stocke la matrice de transformation complète
+    this.xr8Anchor = null; // Pour stocker un éventuel anchor natif 8th Wall
 
-    // Sauvegarde la position/rotation mondiale quand placé sur une surface
+    // Crée un anchor au placement initial
     this.el.addEventListener('placed-on-surface', () => {
       if (this.data.enabled) {
-        this.savedWorldPosition = getWorldPosition(this.el.object3D);
-        this.savedWorldRotation = getWorldQuaternion(this.el.object3D);
-        this.lastParent = this.el.parentElement;
-        console.log('World anchor created at placement:', this.savedWorldPosition);
+        this.createNativeAnchor();
       }
     });
 
-    // Marque qu'on est en train de dragger
+    // Pendant le drag, on désactive l'anchor
     this.el.addEventListener('xrextras-drag-start', () => {
       this.isDragging = true;
+      console.log('Drag started - anchor temporarily disabled');
     });
 
-    // Sauvegarde la nouvelle position mondiale après drag
+    // À la fin du drag, on recrée un anchor
     this.el.addEventListener('xrextras-drag-end', () => {
       this.isDragging = false;
       if (this.data.enabled) {
-        this.savedWorldPosition = getWorldPosition(this.el.object3D);
-        this.savedWorldRotation = getWorldQuaternion(this.el.object3D);
-        this.lastParent = this.el.parentElement;
-        console.log('World anchor updated after drag:', this.savedWorldPosition);
+        // Important : attendre un frame pour que xrextras-hold-drag finisse ses modifications
+        setTimeout(() => {
+          this.createNativeAnchor();
+        }, 50);
       }
     });
   },
 
-  tick: function() {
-    // Si le parent a changé (passage AR ↔ 3D), préserve la position mondiale
-    if (this.data.enabled && !this.isDragging && this.savedWorldPosition && this.el.parentElement !== this.lastParent) {
-      console.log('Parent changed - preserving world position');
+  createNativeAnchor: function() {
+    const obj3D = this.el.object3D;
 
-      // Convertit la position mondiale en position locale dans le nouveau parent
-      const worldPos = this.savedWorldPosition.clone();
-      if (this.el.parentElement && this.el.parentElement.object3D) {
-        this.el.parentElement.object3D.worldToLocal(worldPos);
+    // Méthode 1 : Tenter d'utiliser l'API native d'anchors de 8th Wall
+    if (window.XR8 && XR8.XrController && typeof XR8.XrController.addAnchor === 'function') {
+      const worldPos = getWorldPosition(obj3D);
+      const worldRot = getWorldQuaternion(obj3D);
+
+      try {
+        // Supprime l'ancien anchor s'il existe
+        if (this.xr8Anchor && typeof XR8.XrController.removeAnchor === 'function') {
+          XR8.XrController.removeAnchor(this.xr8Anchor);
+        }
+
+        // Crée un nouvel anchor natif
+        this.xr8Anchor = XR8.XrController.addAnchor(worldPos, worldRot);
+        console.log('Native 8th Wall anchor created:', this.xr8Anchor);
+        return;
+      } catch (e) {
+        console.warn('Native anchor API not available, using fallback:', e);
       }
+    }
 
-      this.el.object3D.position.copy(worldPos);
-      this.lastParent = this.el.parentElement;
+    // Méthode 2 (Fallback) : Force la matrice de transformation directement
+    // Clone la matrice mondiale actuelle
+    this.anchoredMatrix = obj3D.matrixWorld.clone();
+
+    // Freeze la matrice pour empêcher les modifications automatiques
+    obj3D.matrixAutoUpdate = false;
+    obj3D.matrix.copy(this.anchoredMatrix);
+    obj3D.updateMatrixWorld(true);
+
+    console.log('Anchor créé avec matrice freezée:', {
+      position: getWorldPosition(obj3D),
+      rotation: getWorldQuaternion(obj3D)
+    });
+  },
+
+  tick: function() {
+    if (!this.data.enabled || this.isDragging) return;
+
+    const obj3D = this.el.object3D;
+
+    // Si on a freezé la matrice, on la force à chaque frame
+    if (this.anchoredMatrix && !obj3D.matrixAutoUpdate) {
+      obj3D.matrix.copy(this.anchoredMatrix);
+      obj3D.updateMatrixWorld(true);
+    }
+  },
+
+  remove: function() {
+    // Cleanup : restaure matrixAutoUpdate
+    if (this.el.object3D) {
+      this.el.object3D.matrixAutoUpdate = true;
+    }
+
+    // Supprime l'anchor natif s'il existe
+    if (this.xr8Anchor && window.XR8 && XR8.XrController && typeof XR8.XrController.removeAnchor === 'function') {
+      XR8.XrController.removeAnchor(this.xr8Anchor);
     }
   }
 });
