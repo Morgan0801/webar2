@@ -4,6 +4,23 @@
 // is loaded, and before body.html is loaded.
 
 // ========================================
+// Utilitaires pour position/rotation mondiale (inspiré de floatnotes)
+// ========================================
+const getWorldPosition = (object) => {
+  const position = new THREE.Vector3();
+  position.setFromMatrixPosition(object.matrixWorld);
+  return position;
+};
+
+const getWorldQuaternion = (object) => {
+  const position = new THREE.Vector3();
+  const scale = new THREE.Vector3();
+  const target = new THREE.Quaternion();
+  object.matrixWorld.decompose(position, target, scale);
+  return target;
+};
+
+// ========================================
 // COMPOSANT: Place On Detected Surface (utilise le hit testing 8th Wall)
 // ========================================
 AFRAME.registerComponent('place-on-surface', {
@@ -83,6 +100,64 @@ AFRAME.registerComponent('place-on-surface', {
     // Continue d'essayer jusqu'à ce que le placement réussisse
     if (this.data.enabled && this.data.autoPlace && !this.placed && this.camera) {
       this.placeOnSurface();
+    }
+  }
+});
+
+// ========================================
+// COMPOSANT: World Anchor (inspiré de floatnotes - ancrage en coordonnées mondiales)
+// ========================================
+AFRAME.registerComponent('world-anchor', {
+  schema: {
+    enabled: {default: true}
+  },
+
+  init: function() {
+    this.isDragging = false;
+    this.savedWorldPosition = null;
+    this.savedWorldRotation = null;
+    this.lastParent = null;
+
+    // Sauvegarde la position/rotation mondiale quand placé sur une surface
+    this.el.addEventListener('placed-on-surface', () => {
+      if (this.data.enabled) {
+        this.savedWorldPosition = getWorldPosition(this.el.object3D);
+        this.savedWorldRotation = getWorldQuaternion(this.el.object3D);
+        this.lastParent = this.el.parentElement;
+        console.log('World anchor created at placement:', this.savedWorldPosition);
+      }
+    });
+
+    // Marque qu'on est en train de dragger
+    this.el.addEventListener('xrextras-drag-start', () => {
+      this.isDragging = true;
+    });
+
+    // Sauvegarde la nouvelle position mondiale après drag
+    this.el.addEventListener('xrextras-drag-end', () => {
+      this.isDragging = false;
+      if (this.data.enabled) {
+        this.savedWorldPosition = getWorldPosition(this.el.object3D);
+        this.savedWorldRotation = getWorldQuaternion(this.el.object3D);
+        this.lastParent = this.el.parentElement;
+        console.log('World anchor updated after drag:', this.savedWorldPosition);
+      }
+    });
+  },
+
+  tick: function() {
+    // Si le parent a changé (passage AR ↔ 3D), préserve la position mondiale
+    if (this.data.enabled && !this.isDragging && this.savedWorldPosition && this.el.parentElement !== this.lastParent) {
+      console.log('Parent changed - preserving world position');
+
+      // Convertit la position mondiale en position locale dans le nouveau parent
+      const worldPos = this.savedWorldPosition.clone();
+      if (this.el.parentElement && this.el.parentElement.object3D) {
+        this.el.parentElement.object3D.worldToLocal(worldPos);
+      }
+
+      this.el.object3D.position.copy(worldPos);
+      this.lastParent = this.el.parentElement;
     }
   }
 });
@@ -970,6 +1045,9 @@ const activateARMode = () => {
     // ENABLE place-on-surface in AR mode (placement automatique sur surface détectée)
     AppState.modelEntity.setAttribute('place-on-surface', 'enabled', true);
 
+    // ENABLE world-anchor in AR mode (ancrage en coordonnées mondiales)
+    AppState.modelEntity.setAttribute('world-anchor', 'enabled', true);
+
     // La position sera définie automatiquement par place-on-surface
     // On ne force plus la position ici
 
@@ -1023,6 +1101,9 @@ const activate3DViewerMode = () => {
 
     // DISABLE place-on-surface in 3D mode (pas de placement automatique)
     AppState.modelEntity.setAttribute('place-on-surface', 'enabled', false);
+
+    // DISABLE world-anchor in 3D mode (pas d'ancrage, orbit controls gère le positionnement)
+    AppState.modelEntity.setAttribute('world-anchor', 'enabled', false);
 
     // Center model in front of camera (fixed position for QuickLook style)
     AppState.modelEntity.setAttribute('position', '0 0 -2');
