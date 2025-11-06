@@ -5,9 +5,11 @@
 
 // ========================================
 // COMPOSANT: Smooth Position (Anti-Jitter)
+// DÉSACTIVÉ EN MODE AR - ACTIF UNIQUEMENT EN MODE 3D VIEWER
 // ========================================
 AFRAME.registerComponent('smooth-position', {
   schema: {
+    enabled: {default: false}, // Désactivé par défaut (pour AR)
     factor: {default: 0.15} // 0.1 = très smooth mais latence, 0.3 = moins smooth mais réactif
   },
 
@@ -18,6 +20,8 @@ AFRAME.registerComponent('smooth-position', {
   },
 
   tick: function() {
+    // NE PAS APPLIQUER en mode AR (interfère avec le tracking)
+    if (!this.data.enabled) return;
     if (!this.el.object3D.visible) return;
 
     // Première frame : initialise la position smooth
@@ -39,36 +43,50 @@ AFRAME.registerComponent('smooth-position', {
 });
 
 // ========================================
-// COMPOSANT: Lock Scale After Pinch
+// COMPOSANT: Force Constant Scale (empêche scale automatique)
 // ========================================
-AFRAME.registerComponent('lock-scale-after-pinch', {
+AFRAME.registerComponent('force-constant-scale', {
+  schema: {
+    enabled: {default: true}
+  },
+
   init: function() {
-    this.isScaleLocked = false;
     this.lockedScale = null;
     this.isPinching = false;
+    this.isInitialized = false;
 
-    // Écoute les événements de pinch
+    // Écoute les événements de pinch pour permettre le zoom manuel
     this.el.addEventListener('xrextras-pinch-scale-start', () => {
       this.isPinching = true;
-      this.isScaleLocked = false; // Déverrouille pendant le pinch
     });
 
     this.el.addEventListener('xrextras-pinch-scale-end', () => {
       this.isPinching = false;
-      // Verrouille le scale à la fin du pinch
+      // Mémorise le nouveau scale après le pinch
       this.lockedScale = {
         x: this.el.object3D.scale.x,
         y: this.el.object3D.scale.y,
         z: this.el.object3D.scale.z
       };
-      this.isScaleLocked = true;
     });
   },
 
   tick: function() {
-    // Si le scale est verrouillé ET qu'on n'est pas en train de pincher
-    if (this.isScaleLocked && !this.isPinching && this.lockedScale) {
-      // Force le scale verrouillé
+    if (!this.data.enabled) return;
+
+    // Initialise le scale verrouillé au premier tick
+    if (!this.isInitialized && this.el.object3D.scale.x > 0) {
+      this.lockedScale = {
+        x: this.el.object3D.scale.x,
+        y: this.el.object3D.scale.y,
+        z: this.el.object3D.scale.z
+      };
+      this.isInitialized = true;
+      console.log('Scale locked at:', this.lockedScale);
+    }
+
+    // Force le scale constant (sauf pendant le pinch)
+    if (!this.isPinching && this.lockedScale) {
       this.el.object3D.scale.set(
         this.lockedScale.x,
         this.lockedScale.y,
@@ -601,7 +619,7 @@ const EMBEDDED_DISHES_DATA = {
 
 // Application State
 const AppState = {
-  isARMode: false, // START IN 3D VIEWER MODE FOR TESTING
+  isARMode: true, // START IN AR MODE
   currentDish: null,
   dishesData: null,
   scene: null,
@@ -646,14 +664,14 @@ const initApp = async () => {
       viewerCurtain: !!AppState.viewerCurtain
     });
 
-    // START IN 3D VIEWER MODE FOR TESTING
-    console.log('Starting in 3D Viewer mode for testing');
-    activate3DViewerMode();
+    // START IN AR MODE
+    console.log('Starting in AR mode');
+    activateARMode();
 
     // Setup AR toggle button
     const arToggleBtn = document.querySelector('#ar-toggle-btn');
     if (arToggleBtn) {
-      arToggleBtn.textContent = '3D';
+      arToggleBtn.textContent = 'AR';
       arToggleBtn.addEventListener('click', toggleARMode);
       console.log('AR toggle button setup');
     }
@@ -956,10 +974,16 @@ const activateARMode = () => {
     // Re-enable AR gesture controls
     AppState.modelEntity.setAttribute('xrextras-hold-drag', '');
     AppState.modelEntity.setAttribute('xrextras-two-finger-rotate', '');
-    AppState.modelEntity.setAttribute('xrextras-pinch-scale', '');
+    AppState.modelEntity.setAttribute('xrextras-pinch-scale', 'min: 0.5; max: 3');
 
-    // Reset model position (it will be placed via AR gestures)
-    AppState.modelEntity.setAttribute('position', '0 0 0');
+    // DISABLE smooth-position in AR mode (interfère avec le tracking AR)
+    AppState.modelEntity.setAttribute('smooth-position', 'enabled', false);
+
+    // ENABLE force-constant-scale in AR mode (empêche scale automatique)
+    AppState.modelEntity.setAttribute('force-constant-scale', 'enabled', true);
+
+    // Position model in front of camera (visible by default)
+    AppState.modelEntity.setAttribute('position', '0 0 -1.5');
     AppState.modelEntity.setAttribute('rotation', '0 0 0');
 
     // Reset scale to dish default
@@ -1009,6 +1033,12 @@ const activate3DViewerMode = () => {
       rotationSpeed: 1.0,
       zoomSpeed: 1.0
     });
+
+    // Enable smooth-position in 3D mode (optional smoothing for viewer)
+    AppState.modelEntity.setAttribute('smooth-position', 'enabled', true);
+
+    // DISABLE force-constant-scale in 3D mode (permettre zoom libre)
+    AppState.modelEntity.setAttribute('force-constant-scale', 'enabled', false);
 
     // Center model in front of camera (fixed position for QuickLook style)
     AppState.modelEntity.setAttribute('position', '0 0 -2');
