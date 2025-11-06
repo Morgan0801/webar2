@@ -39,6 +39,46 @@ AFRAME.registerComponent('smooth-position', {
 });
 
 // ========================================
+// COMPOSANT: Lock Scale After Pinch
+// ========================================
+AFRAME.registerComponent('lock-scale-after-pinch', {
+  init: function() {
+    this.isScaleLocked = false;
+    this.lockedScale = null;
+    this.isPinching = false;
+
+    // Écoute les événements de pinch
+    this.el.addEventListener('xrextras-pinch-scale-start', () => {
+      this.isPinching = true;
+      this.isScaleLocked = false; // Déverrouille pendant le pinch
+    });
+
+    this.el.addEventListener('xrextras-pinch-scale-end', () => {
+      this.isPinching = false;
+      // Verrouille le scale à la fin du pinch
+      this.lockedScale = {
+        x: this.el.object3D.scale.x,
+        y: this.el.object3D.scale.y,
+        z: this.el.object3D.scale.z
+      };
+      this.isScaleLocked = true;
+    });
+  },
+
+  tick: function() {
+    // Si le scale est verrouillé ET qu'on n'est pas en train de pincher
+    if (this.isScaleLocked && !this.isPinching && this.lockedScale) {
+      // Force le scale verrouillé
+      this.el.object3D.scale.set(
+        this.lockedScale.x,
+        this.lockedScale.y,
+        this.lockedScale.z
+      );
+    }
+  }
+});
+
+// ========================================
 // A-Frame Custom Component: 3D Viewer Orbit Controls
 // ========================================
 
