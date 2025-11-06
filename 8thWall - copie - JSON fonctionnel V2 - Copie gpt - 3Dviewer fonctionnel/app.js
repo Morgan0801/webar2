@@ -984,8 +984,8 @@ const activateARMode = () => {
     // ENABLE lock-scale-on-drag in AR mode (empêche scale automatique pendant drag)
     AppState.modelEntity.setAttribute('lock-scale-on-drag', 'enabled', true);
 
-    // Position model at ground level in front of camera (sur une surface)
-    AppState.modelEntity.setAttribute('position', '0 0 -1.5');
+    // Position model at table height in front of camera (Y=0.8m = hauteur table)
+    AppState.modelEntity.setAttribute('position', '0 0.8 -1.5');
     AppState.modelEntity.setAttribute('rotation', '0 0 0');
 
     // Reset scale to dish default
