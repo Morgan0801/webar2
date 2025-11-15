@@ -4,6 +4,232 @@
 // is loaded, and before body.html is loaded.
 
 // ========================================
+// Utilitaires pour position/rotation mondiale (inspiré de floatnotes)
+// ========================================
+const getWorldPosition = (object) => {
+  const position = new THREE.Vector3();
+  position.setFromMatrixPosition(object.matrixWorld);
+  return position;
+};
+
+const getWorldQuaternion = (object) => {
+  const position = new THREE.Vector3();
+  const scale = new THREE.Vector3();
+  const target = new THREE.Quaternion();
+  object.matrixWorld.decompose(position, target, scale);
+  return target;
+};
+
+// ========================================
+// COMPOSANT: Place On Detected Surface (utilise le hit testing 8th Wall)
+// ========================================
+AFRAME.registerComponent('place-on-surface', {
+  schema: {
+    enabled: {default: true},
+    distance: {default: 1.5}, // Distance devant la caméra
+    autoPlace: {default: true} // Place automatiquement au démarrage
+  },
+
+  init: function() {
+    this.placed = false;
+    this.camera = null;
+
+    // Attend que la scène soit prête
+    this.el.sceneEl.addEventListener('realityready', () => {
+      this.camera = document.querySelector('#camera');
+      console.log('Reality ready, camera found:', !!this.camera);
+
+      if (this.data.autoPlace) {
+        // Attend un peu que le tracking se stabilise
+        setTimeout(() => {
+          this.placeOnSurface();
+        }, 500);
+      }
+    });
+  },
+
+  placeOnSurface: function() {
+    if (!this.data.enabled || this.placed || !this.camera) return;
+
+    const camera = this.camera.object3D;
+
+    // Position devant la caméra (direction forward)
+    const cameraPos = camera.position.clone();
+    const forward = new THREE.Vector3(0, 0, -1);
+    forward.applyQuaternion(camera.quaternion);
+
+    // Calcule le point devant la caméra
+    const targetPos = cameraPos.clone().add(forward.multiplyScalar(this.data.distance));
+
+    // Utilise l'API hit test de 8th Wall si disponible
+    if (window.XR8 && XR8.XrController && XR8.XrController.hitTest) {
+      // Converti la position 3D en coordonnées d'écran normalisées
+      const screenX = 0.5; // Centre de l'écran
+      const screenY = 0.5;
+
+      const hits = XR8.XrController.hitTest(screenX, screenY);
+
+      if (hits && hits.length > 0) {
+        // Prend le premier hit (surface la plus proche)
+        const hit = hits[0];
+
+        // Place le modèle sur la surface détectée
+        this.el.object3D.position.set(
+          hit.position.x,
+          hit.position.y,
+          hit.position.z
+        );
+
+        console.log('Model placed on detected surface at:', hit.position);
+        this.placed = true;
+        this.el.setAttribute('visible', true);
+        this.el.emit('placed-on-surface');
+        return;
+      }
+    }
+
+    // Fallback : place à la position calculée (si pas de hit test disponible)
+    targetPos.y = 0; // Au niveau du sol par défaut
+    this.el.object3D.position.copy(targetPos);
+    this.el.setAttribute('visible', true);
+    this.placed = true;
+    console.log('Model placed at fallback position:', targetPos);
+  },
+
+  tick: function() {
+    // Continue d'essayer jusqu'à ce que le placement réussisse
+    if (this.data.enabled && this.data.autoPlace && !this.placed && this.camera) {
+      this.placeOnSurface();
+    }
+  }
+});
+
+// ========================================
+// COMPOSANT: Native Anchor (utilise l'API bas niveau THREE.js + 8th Wall)
+// ========================================
+AFRAME.registerComponent('world-anchor', {
+  schema: {
+    enabled: {default: true}
+  },
+
+  init: function() {
+    this.isDragging = false;
+    this.anchoredMatrix = null; // Stocke la matrice de transformation complète
+    this.xr8Anchor = null; // Pour stocker un éventuel anchor natif 8th Wall
+
+    // Crée un anchor au placement initial
+    this.el.addEventListener('placed-on-surface', () => {
+      if (this.data.enabled) {
+        this.createNativeAnchor();
+      }
+    });
+
+    // Pendant le drag, on désactive l'anchor
+    this.el.addEventListener('xrextras-drag-start', () => {
+      this.isDragging = true;
+      console.log('Drag started - anchor temporarily disabled');
+    });
+
+    // À la fin du drag, on recrée un anchor
+    this.el.addEventListener('xrextras-drag-end', () => {
+      this.isDragging = false;
+      if (this.data.enabled) {
+        // Important : attendre un frame pour que xrextras-hold-drag finisse ses modifications
+        setTimeout(() => {
+          this.createNativeAnchor();
+        }, 50);
+      }
+    });
+  },
+
+  createNativeAnchor: function() {
+    const obj3D = this.el.object3D;
+
+    // Méthode 1 : Tenter d'utiliser l'API native d'anchors de 8th Wall
+    if (window.XR8 && XR8.XrController && typeof XR8.XrController.addAnchor === 'function') {
+      const worldPos = getWorldPosition(obj3D);
+      const worldRot = getWorldQuaternion(obj3D);
+
+      try {
+        // Supprime l'ancien anchor s'il existe
+        if (this.xr8Anchor && typeof XR8.XrController.removeAnchor === 'function') {
+          XR8.XrController.removeAnchor(this.xr8Anchor);
+        }
+
+        // Crée un nouvel anchor natif
+        this.xr8Anchor = XR8.XrController.addAnchor(worldPos, worldRot);
+        console.log('Native 8th Wall anchor created:', this.xr8Anchor);
+        return;
+      } catch (e) {
+        console.warn('Native anchor API not available, using fallback:', e);
+      }
+    }
+
+    // Méthode 2 (Fallback) : Force la matrice de transformation directement
+    // Clone la matrice mondiale actuelle
+    this.anchoredMatrix = obj3D.matrixWorld.clone();
+
+    // Freeze la matrice pour empêcher les modifications automatiques
+    obj3D.matrixAutoUpdate = false;
+    obj3D.matrix.copy(this.anchoredMatrix);
+    obj3D.updateMatrixWorld(true);
+
+    console.log('Anchor créé avec matrice freezée:', {
+      position: getWorldPosition(obj3D),
+      rotation: getWorldQuaternion(obj3D)
+    });
+  },
+
+  tick: function() {
+    if (!this.data.enabled || this.isDragging) return;
+
+    const obj3D = this.el.object3D;
+
+    // Si on a freezé la matrice, on la force à chaque frame
+    if (this.anchoredMatrix && !obj3D.matrixAutoUpdate) {
+      obj3D.matrix.copy(this.anchoredMatrix);
+      obj3D.updateMatrixWorld(true);
+    }
+  },
+
+  remove: function() {
+    // Cleanup : restaure matrixAutoUpdate
+    if (this.el.object3D) {
+      this.el.object3D.matrixAutoUpdate = true;
+    }
+
+    // Supprime l'anchor natif s'il existe
+    if (this.xr8Anchor && window.XR8 && XR8.XrController && typeof XR8.XrController.removeAnchor === 'function') {
+      XR8.XrController.removeAnchor(this.xr8Anchor);
+    }
+  }
+});
+
+// ========================================
+// COMPOSANT: Extend Camera Near Plane
+// ========================================
+AFRAME.registerComponent('extend-camera-near', {
+  init: function() {
+    // Attend que la caméra soit initialisée
+    const checkCamera = () => {
+      const camera = this.el.getObject3D('camera');
+      if (camera && camera.isPerspectiveCamera) {
+        // Permet de s'approcher TRÈS près (1cm au lieu de 10cm)
+        camera.near = 0.01;
+        camera.far = 10000;
+        camera.updateProjectionMatrix();
+        console.log('Camera near plane extended to 0.01m');
+      } else {
+        // Réessaie dans 100ms si la caméra n'est pas prête
+        setTimeout(checkCamera, 100);
+      }
+    };
+
+    checkCamera();
+  }
+});
+
+// ========================================
 // A-Frame Custom Component: 3D Viewer Orbit Controls
 // ========================================
 
@@ -502,7 +728,7 @@ const EMBEDDED_DISHES_DATA = {
 
 // Application State
 const AppState = {
-  isARMode: false, // START IN 3D VIEWER MODE FOR TESTING
+  isARMode: true, // START IN AR MODE
   currentDish: null,
   dishesData: null,
   scene: null,
@@ -547,14 +773,14 @@ const initApp = async () => {
       viewerCurtain: !!AppState.viewerCurtain
     });
 
-    // START IN 3D VIEWER MODE FOR TESTING
-    console.log('Starting in 3D Viewer mode for testing');
-    activate3DViewerMode();
+    // START IN AR MODE
+    console.log('Starting in AR mode');
+    activateARMode();
 
     // Setup AR toggle button
     const arToggleBtn = document.querySelector('#ar-toggle-btn');
     if (arToggleBtn) {
-      arToggleBtn.textContent = '3D';
+      arToggleBtn.textContent = 'AR';
       arToggleBtn.addEventListener('click', toggleARMode);
       console.log('AR toggle button setup');
     }
@@ -855,13 +1081,18 @@ const activateARMode = () => {
     }
 
     // Re-enable AR gesture controls
-    AppState.modelEntity.setAttribute('xrextras-hold-drag', '');
+    AppState.modelEntity.setAttribute('xrextras-hold-drag', 'dragDelay: 0');
     AppState.modelEntity.setAttribute('xrextras-two-finger-rotate', '');
-    AppState.modelEntity.setAttribute('xrextras-pinch-scale', '');
+    AppState.modelEntity.setAttribute('xrextras-pinch-scale', 'min: 0.5; max: 3');
 
-    // Reset model position (it will be placed via AR gestures)
-    AppState.modelEntity.setAttribute('position', '0 0 0');
-    AppState.modelEntity.setAttribute('rotation', '0 0 0');
+    // ENABLE place-on-surface in AR mode (placement automatique sur surface détectée)
+    AppState.modelEntity.setAttribute('place-on-surface', 'enabled', true);
+
+    // ENABLE world-anchor in AR mode (ancrage en coordonnées mondiales)
+    AppState.modelEntity.setAttribute('world-anchor', 'enabled', true);
+
+    // La position sera définie automatiquement par place-on-surface
+    // On ne force plus la position ici
 
     // Reset scale to dish default
     if (AppState.currentDish) {
@@ -910,6 +1141,12 @@ const activate3DViewerMode = () => {
       rotationSpeed: 1.0,
       zoomSpeed: 1.0
     });
+
+    // DISABLE place-on-surface in 3D mode (pas de placement automatique)
+    AppState.modelEntity.setAttribute('place-on-surface', 'enabled', false);
+
+    // DISABLE world-anchor in 3D mode (pas d'ancrage, orbit controls gère le positionnement)
+    AppState.modelEntity.setAttribute('world-anchor', 'enabled', false);
 
     // Center model in front of camera (fixed position for QuickLook style)
     AppState.modelEntity.setAttribute('position', '0 0 -2');

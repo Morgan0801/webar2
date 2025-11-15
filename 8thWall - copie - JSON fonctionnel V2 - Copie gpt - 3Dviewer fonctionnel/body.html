@@ -20,7 +20,8 @@
     position="0 2 2"
     rotation="0 0 0"
     raycaster="objects: .cantap"
-    cursor="fuse: false; rayOrigin: mouse;">
+    cursor="fuse: false; rayOrigin: mouse;"
+    extend-camera-near>
     <!-- Viewer mode curtain: hides camera feed when active -->
     <a-entity
       id="viewer-curtain"
@@ -49,15 +50,17 @@
   <!-- Dish model - will be loaded dynamically -->
   <a-entity
     id="model"
-    position="0 2 -1"
+    position="0 0 0"
     rotation="0 0 0"
     scale="1 1 1"
     visible="false"
     class="cantap"
     viewer-orbit-controls="enabled: false"
-    xrextras-hold-drag
+    place-on-surface="enabled: true; distance: 1.5; autoPlace: true"
+    world-anchor="enabled: true"
+    xrextras-hold-drag="dragDelay: 0"
     xrextras-two-finger-rotate
-    xrextras-pinch-scale
+    xrextras-pinch-scale="min: 0.5; max: 3"
     shadow="receive: false">
   </a-entity>
 
